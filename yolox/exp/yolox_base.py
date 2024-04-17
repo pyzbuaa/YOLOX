@@ -25,7 +25,9 @@ class Exp(BaseExp):
         # factor of model width
         self.width = 1.00
         # activation name. For example, if using "relu", then "silu" will be replaced to "relu".
-        self.act = "silu"
+        self.act = "relu"
+
+        self.conv_mode = 'conv' # conv, depthwise, vargroup
 
         # ---------------- dataloader config ---------------- #
         # set worker to 4 for shorter dataloader init time
@@ -38,7 +40,7 @@ class Exp(BaseExp):
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
         # dir of dataset images, if data_dir is None, this project will use `datasets` dir
-        self.data_dir = None
+        self.data_dir = '/home/pyz/data/coco'
         # name of annotation file for training
         self.train_ann = "instances_train2017.json"
         # name of annotation file for evaluation
@@ -89,7 +91,7 @@ class Exp(BaseExp):
         self.momentum = 0.9
         # log period in iter, for example,
         # if set to 1, user could see log every iteration.
-        self.print_interval = 10
+        self.print_interval = 50
         # eval period in epoch, for example,
         # if set to 1, model will be evaluate after every epoch.
         self.eval_interval = 10
@@ -119,8 +121,8 @@ class Exp(BaseExp):
 
         if getattr(self, "model", None) is None:
             in_channels = [256, 512, 1024]
-            backbone = YOLOPAFPN(self.depth, self.width, in_channels=in_channels, act=self.act)
-            head = YOLOXHead(self.num_classes, self.width, in_channels=in_channels, act=self.act)
+            backbone = YOLOPAFPN(self.depth, self.width, in_channels=in_channels, conv_mode=self.conv_mode, act=self.act)
+            head = YOLOXHead(self.num_classes, self.width, in_channels=in_channels, conv_mode=self.conv_mode, act=self.act)
             self.model = YOLOX(backbone, head)
 
         self.model.apply(init_yolo)

@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from yolox.utils import bboxes_iou, cxcywh2xyxy, meshgrid, visualize_assign
 
 from .losses import IOUloss
-from .network_blocks import BaseConv, DWConv
+from .network_blocks import BaseConv, DWConv, get_convmodule
 
 
 class YOLOXHead(nn.Module):
@@ -23,7 +23,7 @@ class YOLOXHead(nn.Module):
         strides=[8, 16, 32],
         in_channels=[256, 512, 1024],
         act="silu",
-        depthwise=False,
+        conv_mode='conv',
     ):
         """
         Args:
@@ -41,7 +41,7 @@ class YOLOXHead(nn.Module):
         self.reg_preds = nn.ModuleList()
         self.obj_preds = nn.ModuleList()
         self.stems = nn.ModuleList()
-        Conv = DWConv if depthwise else BaseConv
+        Conv = get_convmodule(conv_mode)
 
         for i in range(len(in_channels)):
             self.stems.append(

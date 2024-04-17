@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from .darknet import CSPDarknet
-from .network_blocks import BaseConv, CSPLayer, DWConv
+from .network_blocks import BaseConv, CSPLayer, DWConv, get_convmodule
 
 
 class YOLOPAFPN(nn.Module):
@@ -20,14 +20,14 @@ class YOLOPAFPN(nn.Module):
         width=1.0,
         in_features=("dark3", "dark4", "dark5"),
         in_channels=[256, 512, 1024],
-        depthwise=False,
+        conv_mode='conv',
         act="silu",
     ):
         super().__init__()
-        self.backbone = CSPDarknet(depth, width, depthwise=depthwise, act=act)
+        self.backbone = CSPDarknet(depth, width, conv_mode=conv_mode, act=act)
         self.in_features = in_features
         self.in_channels = in_channels
-        Conv = DWConv if depthwise else BaseConv
+        Conv = get_convmodule(conv_mode)
 
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
         self.lateral_conv0 = BaseConv(
@@ -38,7 +38,7 @@ class YOLOPAFPN(nn.Module):
             int(in_channels[1] * width),
             round(3 * depth),
             False,
-            depthwise=depthwise,
+            conv_mode=conv_mode,
             act=act,
         )  # cat
 
@@ -50,7 +50,7 @@ class YOLOPAFPN(nn.Module):
             int(in_channels[0] * width),
             round(3 * depth),
             False,
-            depthwise=depthwise,
+            conv_mode=conv_mode,
             act=act,
         )
 
@@ -63,7 +63,7 @@ class YOLOPAFPN(nn.Module):
             int(in_channels[1] * width),
             round(3 * depth),
             False,
-            depthwise=depthwise,
+            conv_mode=conv_mode,
             act=act,
         )
 
@@ -76,7 +76,7 @@ class YOLOPAFPN(nn.Module):
             int(in_channels[2] * width),
             round(3 * depth),
             False,
-            depthwise=depthwise,
+            conv_mode=conv_mode,
             act=act,
         )
 

@@ -14,6 +14,18 @@ class SiLU(nn.Module):
         return x * torch.sigmoid(x)
 
 
+def get_convmodule(name):
+    if name == 'conv':
+        module = BaseConv
+    elif name == 'depthwise':
+        module = DWConv
+    elif name == 'vargroup':
+        module = VargConv
+    else:
+        raise AttributeError("Unsupported act type: {}".format(name))
+    return module
+
+
 def get_activation(name="silu", inplace=True):
     if name == "silu":
         module = nn.SiLU(inplace=inplace)
@@ -74,6 +86,70 @@ class DWConv(nn.Module):
     def forward(self, x):
         x = self.dconv(x)
         return self.pconv(x)
+    
+
+class SeparableGroupConv(nn.Module):
+    """Separable group conv + conv"""
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        ksize,
+        stride=1,
+        groups=1,
+        factor=1,
+        act='relu'
+    ):
+        super(SeparableGroupConv, self).__init__()
+        mid_channels = int(factor * in_channels)
+        self.gconv = BaseConv(
+            in_channels,
+            mid_channels,
+            ksize,
+            stride,
+            groups=groups,
+            act=act
+        )
+        self.pconv = BaseConv(
+            mid_channels,
+            out_channels,
+            1,
+            1,
+            groups=1,
+            act=act
+        )
+
+    def forward(self, x):
+        x = self.gconv(x)
+        return self.pconv(x)
+
+
+class VargConv(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        ksize,
+        stride=1,
+        group_base=4,
+        factor=1,
+        act="relu"
+    ):
+        super().__init__()
+        groups = int(in_channels / group_base)
+        self.conv = SeparableGroupConv(
+            in_channels,
+            out_channels,
+            ksize,
+            stride,
+            groups,
+            factor,
+            act=act
+        )
+
+    def forward(self, x):
+        return self.conv(x)
 
 
 class Bottleneck(nn.Module):
@@ -84,12 +160,12 @@ class Bottleneck(nn.Module):
         out_channels,
         shortcut=True,
         expansion=0.5,
-        depthwise=False,
+        conv_mode='conv',
         act="silu",
     ):
         super().__init__()
         hidden_channels = int(out_channels * expansion)
-        Conv = DWConv if depthwise else BaseConv
+        Conv = get_convmodule(conv_mode)
         self.conv1 = BaseConv(in_channels, hidden_channels, 1, stride=1, act=act)
         self.conv2 = Conv(hidden_channels, out_channels, 3, stride=1, act=act)
         self.use_add = shortcut and in_channels == out_channels
@@ -154,7 +230,7 @@ class CSPLayer(nn.Module):
         n=1,
         shortcut=True,
         expansion=0.5,
-        depthwise=False,
+        conv_mode='conv',
         act="silu",
     ):
         """
@@ -171,7 +247,7 @@ class CSPLayer(nn.Module):
         self.conv3 = BaseConv(2 * hidden_channels, out_channels, 1, stride=1, act=act)
         module_list = [
             Bottleneck(
-                hidden_channels, hidden_channels, shortcut, 1.0, depthwise, act=act
+                hidden_channels, hidden_channels, shortcut, 1.0, conv_mode=conv_mode, act=act
             )
             for _ in range(n)
         ]
